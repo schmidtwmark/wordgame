@@ -53,15 +53,16 @@ class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
     "Cookie",
     "Egg",
     "Purse",
-    "Rug"
-  ]; //.map((word) => Text(word, style: TextStyle(fontSize: 24)));
+    "Rug",
+    "New"
+  ];
 
   static const int STARTING_WORDS = 10;
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(seconds: 20),
+      duration: const Duration(seconds: 5),
       animationBehavior: AnimationBehavior.preserve,
       vsync: this,
     );
@@ -88,29 +89,38 @@ class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     var height = MediaQuery.of(context).size.height * 0.8;
     print(height);
+    double integral = 0;
 
     return AnimatedBuilder(
       animation: _controller,
       builder: (BuildContext context, Widget child) {
-        // 10 Texts on the screen at the start
-        // print(
-        //     "Controller value ${_controller.value}, curve value ${_curve.value}");
-        double rawOffset = _curve.value * 5000;
-        int wordIndex =
-            (rawOffset / (height / STARTING_WORDS) % _words.length).floor();
+        double containerHeight = 37;
+        double rawOffset = _curve.value * 157 / 3 * containerHeight;
+        int wordIndex = ((rawOffset / containerHeight) % _words.length).floor();
         int end = (wordIndex + STARTING_WORDS) % _words.length;
+
+        print(
+            "rawOffset $rawOffset, trueIndex ${rawOffset / containerHeight}, integral $integral, wordIndex $wordIndex");
+
         var column = Column(
             children: getSubset(_words, wordIndex, end)
-                .map((word) => Text(word,
-                    style: TextStyle(fontSize: height / STARTING_WORDS)))
+                .map((word) => Container(
+                    height: containerHeight,
+                    color: Color.fromARGB(
+                        255, 120, _words.indexOf(word) * 10, 120),
+                    child: Center(
+                        child: Text(word,
+                            style: TextStyle(fontSize: containerHeight * .8)))))
                 .toList());
-
+        double trueOffset = -rawOffset % containerHeight;
+        integral += trueOffset;
         var translate = Transform.translate(
-          offset: Offset(0, -rawOffset % (height / STARTING_WORDS)),
+          offset: Offset(0, trueOffset),
           child: column,
         );
         // return translate;
-        return Transform.scale(scale: _curve.value + 1, child: translate);
+        return Transform.scale(
+            scale: (_curve.value * 3) + 1.5, child: translate);
       },
     );
   }
