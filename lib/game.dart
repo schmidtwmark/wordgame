@@ -13,13 +13,17 @@ class GuessScreen extends StatelessWidget {
             appBar: AppBar(
               title: Text("Guess a Word"),
             ),
-            body: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Text(
-                    "Flip your phone to landscape and show it to the other players to generate a word")
-              ],
-            ));
+            body: Padding(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Text(
+                      "Flip your phone to landscape and show it to the other players to generate a word",
+                      style: TextStyle(fontSize: 40),
+                    )
+                  ],
+                )));
       }
     });
   }
@@ -33,6 +37,12 @@ class Spinner extends StatefulWidget {
 class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
   AnimationController _controller;
   Animation _curve;
+  Widget _column;
+  Widget _transformed;
+  bool _spinComplete = false;
+  double _offset = 0;
+  double _integral = 0;
+  double _containerHeight;
   final List<String> _words = const [
     "Dog",
     "Cat",
@@ -57,7 +67,7 @@ class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
     "New"
   ];
 
-  static const int STARTING_WORDS = 10;
+  static const int STARTING_WORDS = 11;
   @override
   void initState() {
     super.initState();
@@ -68,6 +78,14 @@ class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
     );
     _curve = CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic);
     _controller.forward();
+    _controller.addStatusListener((AnimationStatus status) {
+      if (status == AnimationStatus.completed) {
+        setState(() {
+          print("Marking spin complete!");
+          _spinComplete = true;
+        });
+      }
+    });
   }
 
   @override
@@ -85,43 +103,47 @@ class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
     }
   }
 
+  Widget transformColumn(double curveValue) {
+    double rawOffset = _curve.value * 50 * _containerHeight;
+    int wordIndex = ((rawOffset / _containerHeight) % _words.length).floor();
+    int end = (wordIndex + STARTING_WORDS) % _words.length;
+
+    _column = Column(
+        children: getSubset(_words, wordIndex, end)
+            .map((word) => Container(
+                height: _containerHeight.toDouble(),
+                color: Color.fromARGB(255, 120, _words.indexOf(word) * 10, 120),
+                child: Center(
+                    child: Text(word,
+                        style: TextStyle(fontSize: _containerHeight * .8)))))
+            .toList());
+
+    _offset = -rawOffset % _containerHeight;
+    _integral += _offset;
+    var translate =
+        Transform.translate(offset: Offset(0, _offset), child: _column);
+
+    _transformed =
+        Transform.scale(scale: (_curve.value * 3) + 1.5, child: translate);
+    return _transformed;
+  }
+
   @override
   Widget build(BuildContext context) {
-    var height = MediaQuery.of(context).size.height * 0.8;
-    print(height);
-    double integral = 0;
+    var height = MediaQuery.of(context).size.height;
+    _containerHeight = height / STARTING_WORDS;
 
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (BuildContext context, Widget child) {
-        double containerHeight = 37;
-        double rawOffset = _curve.value * 157 / 3 * containerHeight;
-        int wordIndex = ((rawOffset / containerHeight) % _words.length).floor();
-        int end = (wordIndex + STARTING_WORDS) % _words.length;
-
-        print(
-            "rawOffset $rawOffset, trueIndex ${rawOffset / containerHeight}, integral $integral, wordIndex $wordIndex");
-
-        var column = Column(
-            children: getSubset(_words, wordIndex, end)
-                .map((word) => Container(
-                    height: containerHeight,
-                    color: Color.fromARGB(
-                        255, 120, _words.indexOf(word) * 10, 120),
-                    child: Center(
-                        child: Text(word,
-                            style: TextStyle(fontSize: containerHeight * .8)))))
-                .toList());
-        double trueOffset = -rawOffset % containerHeight;
-        integral += trueOffset;
-        var translate = Transform.translate(
-          offset: Offset(0, trueOffset),
-          child: column,
-        );
-        // return translate;
-        return Transform.scale(
-            scale: (_curve.value * 3) + 1.5, child: translate);
-      },
-    );
+    if (!_spinComplete) {
+      return AnimatedBuilder(
+        animation: _controller,
+        builder: (BuildContext context, Widget child) {
+          return transformColumn(_curve.value);
+        },
+      );
+    } else {
+      print("Drawing spin complete!");
+      return _transformed;
+      // return Center(child: Transform.scale(scale: 3 + 1.5, child: _column));
+    }
   }
 }
