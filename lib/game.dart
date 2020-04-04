@@ -1,13 +1,32 @@
+import 'words.dart';
+
 import 'package:flutter/material.dart';
 import 'dart:math';
 
 class GuessScreen extends StatelessWidget {
+  static const int STARTING_WORDS = 11;
   @override
   Widget build(BuildContext context) {
     return OrientationBuilder(builder: (context, orientation) {
       if (orientation == Orientation.landscape) {
         // Begin word animation
-        return Scaffold(body: Center(child: Spinner()));
+        var height = MediaQuery.of(context).size.height;
+        var containerHeight = height / STARTING_WORDS;
+
+        return Scaffold(
+            body: Center(
+                child: Spinner(
+                    containerCount: STARTING_WORDS,
+                    containerHeight: containerHeight,
+                    duration: Duration(seconds: 10),
+                    builder: (index) => Container(
+                        height: containerHeight.toDouble(),
+                        color: Color.fromARGB(
+                            255, 120, ((index % words.length) * 10) % 255, 120),
+                        child: Center(
+                            child: Text(words[index % words.length],
+                                style: TextStyle(
+                                    fontSize: containerHeight * .8)))))));
       } else {
         return Scaffold(
             appBar: AppBar(
@@ -29,7 +48,25 @@ class GuessScreen extends StatelessWidget {
   }
 }
 
+typedef ContainerBuilder = Widget Function(int a);
+
 class Spinner extends StatefulWidget {
+  final int containerCount;
+  final double containerHeight;
+  final Duration duration;
+
+  // Builder function that takes in an int and returns a fixed size container
+  final ContainerBuilder builder;
+  final Curve curve;
+
+  Spinner({
+    @required this.containerCount,
+    @required this.containerHeight,
+    @required this.builder,
+    @required this.duration,
+    this.curve: Curves.easeInOutCubic,
+  });
+
   @override
   State<StatefulWidget> createState() => _SpinnerState();
 }
@@ -41,42 +78,16 @@ class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
   Widget _transformed;
   bool _spinComplete = false;
   double _offset = 0;
-  double _integral = 0;
-  double _containerHeight;
-  final List<String> _words = const [
-    "Dog",
-    "Cat",
-    "Batman",
-    "Coaster",
-    "Seashell",
-    "Laptop",
-    "Couch",
-    "Chair",
-    "Lamp",
-    "Stairs",
-    "Picture",
-    "TikTok",
-    "Driveway",
-    "Mailbox",
-    "Fence",
-    "Popcorn",
-    "Cookie",
-    "Egg",
-    "Purse",
-    "Rug",
-    "New"
-  ];
 
-  static const int STARTING_WORDS = 11;
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(seconds: 5),
+      duration: widget.duration,
       animationBehavior: AnimationBehavior.preserve,
       vsync: this,
     );
-    _curve = CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic);
+    _curve = CurvedAnimation(parent: _controller, curve: widget.curve);
     _controller.forward();
     _controller.addStatusListener((AnimationStatus status) {
       if (status == AnimationStatus.completed) {
@@ -94,32 +105,23 @@ class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  List<String> getSubset(List<String> list, int begin, int end) {
-    if (begin <= end) {
-      return list.getRange(begin, end).toList();
-    } else {
-      return list.getRange(begin, list.length).toList()
-        ..addAll(list.getRange(0, end));
-    }
+  Iterable<int> get positiveIntegers sync* {
+    int i = 0;
+    while (true) yield i++;
   }
 
   Widget transformColumn(double curveValue) {
-    double rawOffset = _curve.value * 50 * _containerHeight;
-    int wordIndex = ((rawOffset / _containerHeight) % _words.length).floor();
-    int end = (wordIndex + STARTING_WORDS) % _words.length;
+    double rawOffset = _curve.value * 50 * widget.containerHeight;
+    int start = ((rawOffset / widget.containerHeight)).floor();
 
     _column = Column(
-        children: getSubset(_words, wordIndex, end)
-            .map((word) => Container(
-                height: _containerHeight.toDouble(),
-                color: Color.fromARGB(255, 120, _words.indexOf(word) * 10, 120),
-                child: Center(
-                    child: Text(word,
-                        style: TextStyle(fontSize: _containerHeight * .8)))))
+        children: positiveIntegers
+            .skip(start)
+            .take(widget.containerCount)
+            .map(widget.builder)
             .toList());
 
-    _offset = -rawOffset % _containerHeight;
-    _integral += _offset;
+    _offset = -rawOffset % widget.containerHeight;
     var translate =
         Transform.translate(offset: Offset(0, _offset), child: _column);
 
@@ -130,9 +132,6 @@ class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    var height = MediaQuery.of(context).size.height;
-    _containerHeight = height / STARTING_WORDS;
-
     if (!_spinComplete) {
       return AnimatedBuilder(
         animation: _controller,
