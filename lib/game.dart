@@ -1,7 +1,5 @@
 import 'words.dart';
-
 import 'package:flutter/material.dart';
-import 'dart:math';
 
 class GuessScreen extends StatelessWidget {
   static const int STARTING_WORDS = 11;
@@ -17,8 +15,11 @@ class GuessScreen extends StatelessWidget {
             body: Center(
                 child: Spinner(
                     containerCount: STARTING_WORDS,
-                    containerHeight: containerHeight,
-                    duration: Duration(seconds: 10),
+                    containerSize: containerHeight,
+                    animationSpeed: 1,
+                    zoomFactor: 1,
+                    duration: Duration(seconds: 5),
+                    spinDirection: SpinnerDirection.up,
                     builder: (index) => Container(
                         height: containerHeight.toDouble(),
                         color: Color.fromARGB(
@@ -48,24 +49,109 @@ class GuessScreen extends StatelessWidget {
   }
 }
 
-typedef ContainerBuilder = Widget Function(int a);
+class GuessScreenWidth extends StatelessWidget {
+  static const int STARTING_WORDS = 5;
+  @override
+  Widget build(BuildContext context) {
+    return OrientationBuilder(builder: (context, orientation) {
+      if (orientation == Orientation.landscape) {
+        // Begin word animation
+        var height = MediaQuery.of(context).size.width;
+        var containerWidth = height / STARTING_WORDS;
+
+        return Scaffold(
+            body: Center(
+                child: Spinner(
+                    containerCount: STARTING_WORDS,
+                    containerSize: containerWidth,
+                    animationSpeed: 1,
+                    zoomFactor: 1,
+                    duration: Duration(seconds: 5),
+                    spinDirection: SpinnerDirection.left,
+                    builder: (index) => Container(
+                        width: containerWidth.toDouble(),
+                        color: Color.fromARGB(
+                            255, 120, ((index % words.length) * 10) % 255, 120),
+                        child: Center(
+                            child: Text(words[index % words.length],
+                                style: TextStyle(fontSize: 24)))))));
+      } else {
+        return Scaffold(
+            appBar: AppBar(
+              title: Text("Guess a Word"),
+            ),
+            body: Padding(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Text(
+                      "Flip your phone to landscape and show it to the other players to generate a word",
+                      style: TextStyle(fontSize: 40),
+                    )
+                  ],
+                )));
+      }
+    });
+  }
+}
+
+typedef ContainerBuilder = Widget Function(int index);
+typedef SpinnerCallback = void Function(int index);
+
+enum SpinnerDirection { up, down, left, right }
 
 class Spinner extends StatefulWidget {
+  // Number of containers on screen
+  // If this is an even number, animation speed will be adjusted so the animation
+  // ends with a container directly in the middle
   final int containerCount;
-  final double containerHeight;
-  final Duration duration;
+
+  // Static length of each container in spinner direction
+  // Up/Down this should be the height of each container
+  // Left/Right this should be the width of each container
+  final double containerSize;
+
+  // Number of tiles to pass over during the animation sequence
+  // This number can be larger than the container and will wrap around
+
+  final int animationSpeed;
 
   // Builder function that takes in an int and returns a fixed size container
   final ContainerBuilder builder;
+
+  // Animation duration
+  final Duration duration;
+
+  // Animation curve definition
+  // Defaults to ease in out cubic
   final Curve curve;
 
-  Spinner({
-    @required this.containerCount,
-    @required this.containerHeight,
-    @required this.builder,
-    @required this.duration,
-    this.curve: Curves.easeInOutCubic,
-  });
+  // Optional Callback function to fire at the end.
+  // Fires with the index of the element that the spinner lands on
+  final SpinnerCallback callback;
+
+  // Specify zoom factor for final position of the animation
+  // Defaults to 1 for no zoom
+  final double zoomFactor;
+
+  // Direction containers
+  final SpinnerDirection spinDirection;
+
+  Spinner(
+      {@required this.containerCount,
+      @required this.containerSize,
+      @required this.animationSpeed,
+      @required this.builder,
+      @required this.duration,
+      this.curve: Curves.easeInOutCubic,
+      this.callback: emptyCallback,
+      this.zoomFactor: 1.0,
+      this.spinDirection: SpinnerDirection.up});
+
+  static void emptyCallback(int index) {
+    print("Ending at index $index");
+  }
 
   @override
   State<StatefulWidget> createState() => _SpinnerState();
@@ -76,8 +162,8 @@ class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
   Animation _curve;
   Widget _column;
   Widget _transformed;
-  bool _spinComplete = false;
   double _offset = 0;
+  int _index = 0;
 
   @override
   void initState() {
@@ -88,15 +174,17 @@ class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
       vsync: this,
     );
     _curve = CurvedAnimation(parent: _controller, curve: widget.curve);
-    _controller.forward();
     _controller.addStatusListener((AnimationStatus status) {
       if (status == AnimationStatus.completed) {
-        setState(() {
-          print("Marking spin complete!");
-          _spinComplete = true;
-        });
+        // Execute this first to "Finish" the animation
+        transformColumn(1.0);
+
+        // Call the optional callback
+        var endIndex = _index + (widget.containerCount / 2).ceil();
+        widget.callback(endIndex);
       }
     });
+    _controller.forward(); //start the animation
   }
 
   @override
@@ -105,44 +193,74 @@ class _SpinnerState extends State<Spinner> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  Iterable<int> get positiveIntegers sync* {
-    int i = 0;
+  Iterable<int> positiveIntegers(int start) sync* {
+    int i = start;
     while (true) yield i++;
   }
 
   Widget transformColumn(double curveValue) {
-    double rawOffset = _curve.value * 50 * widget.containerHeight;
-    int start = ((rawOffset / widget.containerHeight)).floor();
+    // If the number of widgets on screen is even, we need to end up halfway between widgets
+    // Adjust the speed appropriately
+    double trueSpeed = widget.containerCount % 2 == 0 // is even
+        ? widget.animationSpeed.toDouble() + 0.5
+        : widget.animationSpeed.toDouble();
 
-    _column = Column(
-        children: positiveIntegers
-            .skip(start)
-            .take(widget.containerCount)
-            .map(widget.builder)
-            .toList());
+    // How far to shift the entire column by
+    double rawOffset = _curve.value * trueSpeed * widget.containerSize;
 
-    _offset = -rawOffset % widget.containerHeight;
-    var translate =
-        Transform.translate(offset: Offset(0, _offset), child: _column);
+    // Which index should be at the top of the column?
+    _index = ((rawOffset / widget.containerSize)).floor();
+    if (widget.spinDirection == SpinnerDirection.down ||
+        widget.spinDirection == SpinnerDirection.right) {
+      _index *= -1;
+    }
 
-    _transformed =
-        Transform.scale(scale: (_curve.value * 3) + 1.5, child: translate);
+    // Calculate the true offset
+    _offset = (rawOffset % widget.containerSize);
+    if (widget.spinDirection == SpinnerDirection.up ||
+        widget.spinDirection == SpinnerDirection.left) {
+      _offset *= -1;
+    }
+
+    // Widget offset will be different for left/right versus up/down
+    Offset widgetOffset;
+
+    // Call the widget builder to get the children that will go in the column/row
+    List<Widget> children = positiveIntegers(_index)
+        .take(widget.containerCount + 2)
+        .map(widget.builder)
+        .toList();
+
+    // For up/down direction, place in a column with vertical overflow
+    // For left/right, use a row with overflow horizontally
+    if (widget.spinDirection == SpinnerDirection.up ||
+        widget.spinDirection == SpinnerDirection.down) {
+      widgetOffset = Offset(0, _offset);
+      _column = OverflowBox(
+          maxHeight: widget.containerSize * (widget.containerCount + 2),
+          child: Column(children: children));
+    } else {
+      widgetOffset = Offset(_offset, 0);
+      _column = OverflowBox(
+          maxWidth: widget.containerSize * (widget.containerCount + 2),
+          child: Row(children: children));
+    }
+
+    // Translate the entire column
+    var translate = Transform.translate(child: _column, offset: widgetOffset);
+    // Scale the column, if necessary
+    _transformed = Transform.scale(
+        scale: (_curve.value * (widget.zoomFactor - 1)) + 1, child: translate);
     return _transformed;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_spinComplete) {
-      return AnimatedBuilder(
-        animation: _controller,
-        builder: (BuildContext context, Widget child) {
-          return transformColumn(_curve.value);
-        },
-      );
-    } else {
-      print("Drawing spin complete!");
-      return _transformed;
-      // return Center(child: Transform.scale(scale: 3 + 1.5, child: _column));
-    }
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (BuildContext context, Widget child) {
+        return transformColumn(_curve.value);
+      },
+    );
   }
 }

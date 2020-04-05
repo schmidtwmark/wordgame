@@ -30,8 +30,10 @@ class MyHomePage extends StatelessWidget {
             RaisedButton(
               child: Text("Guess a Word"),
               onPressed: () {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => GuessScreen()));
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => GuessScreenWidth()));
               },
             ),
             RaisedButton(
