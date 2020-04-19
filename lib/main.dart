@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'game.dart';
+import 'clue.dart';
 
 void main() => runApp(MyApp());
 
@@ -30,16 +31,15 @@ class MyHomePage extends StatelessWidget {
             RaisedButton(
               child: Text("Guess a Word"),
               onPressed: () {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => GuessScreenWidth()));
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (context) => GuessScreen()));
               },
             ),
             RaisedButton(
               child: Text("Give a Clue"),
               onPressed: () {
-                // TODO go to Clue screen
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (context) => ClueScreen()));
               },
             ),
             RaisedButton(
