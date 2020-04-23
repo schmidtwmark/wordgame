@@ -4,16 +4,17 @@ import 'package:flutter/material.dart';
 class ClueScreen extends StatelessWidget {
   static const int STARTING_WORDS = 11;
 
-  String clue = "";
+  String clue = "Clue";
   @override
   Widget build(BuildContext context) {
     return OrientationBuilder(builder: (context, orientation) {
       if (orientation == Orientation.landscape) {
         // Display word
         return Scaffold(
-          body: Center(child: Text(clue)),
+          body: Center(child: Text(clue, style: TextStyle(fontSize: 144))),
         );
       } else {
+        TextEditingController controller = TextEditingController()..text = clue;
         return Scaffold(
             appBar: AppBar(
               title: Text("Give a Clue"),
@@ -27,26 +28,24 @@ class ClueScreen extends StatelessWidget {
                       padding: EdgeInsets.all(20),
                       child: Text(
                         "Type a one word clue and rotate your phone to lock it in",
-                        style: TextStyle(fontSize: 18),
+                        style: TextStyle(fontSize: 24),
                         textAlign: TextAlign.center,
                       )),
                   Padding(
                       padding: EdgeInsets.all(20),
                       child: TextField(
+                        autofocus: true,
+                        controller: controller,
                         maxLines: 1,
                         autocorrect: false,
                         textAlign: TextAlign.center,
-                        // textInputAction: TextInputAction.next,
+                        style: TextStyle(fontSize: 24),
                         onChanged: (String s) {
-                          clue = s;
+                          String newString = s.replaceAll(" ", "");
+                          controller.text = newString;
+                          clue = newString;
                         },
                       )),
-                  Padding(
-                      padding: EdgeInsets.all(20),
-                      child: Text(
-                          "Show your clues to your fellow clue givers, and get rid of any duplicate clues",
-                          style: TextStyle(fontSize: 18),
-                          textAlign: TextAlign.center))
                 ],
               ),
               padding: EdgeInsets.all(20),
